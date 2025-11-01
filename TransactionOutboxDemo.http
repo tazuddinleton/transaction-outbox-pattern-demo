@@ -1,0 +1,25 @@
+@TransactionOutboxDemo_HostAddress = http://localhost:5071
+
+GET {{TransactionOutboxDemo_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+POST {{TransactionOutboxDemo_HostAddress}}/api/Order
+Accept: application/json
+Content-Type: application/json
+
+{
+  "customerName": "Taz Uddin",
+  "customerEmail": "taz.uddin@hey.com",
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 5
+    },
+  {
+      "productId": 2,
+      "quantity": 6
+    }
+  ]
+}
