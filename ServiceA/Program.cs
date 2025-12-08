@@ -10,6 +10,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<OutboxDbContext>(opt =>
     opt.UseInMemoryDatabase("outbox-demo")); // swap for real DB in production
 
+builder.Services.AddScoped<IOutboxPublisher, OutboxPublisher>();
+
 // Configure MassTransit to use RabbitMQ topic exchange "app.events"
 builder.Services.AddMassTransit(x =>
 {
@@ -38,24 +40,13 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 // Minimal API to create an order -> writes to Outbox (simulating Service A domain logic)
-app.MapPost("/orders", async (string customerEmail, decimal totalAmount, OutboxDbContext db) =>
+app.MapPost("/orders", async (string customerEmail, decimal totalAmount, IOutboxPublisher publisher) =>
 {
     var orderId = Guid.NewGuid();
     var evt = new OrderCreated(orderId, customerEmail, totalAmount, DateTime.UtcNow);
 
     // Why outbox? Persist event with business data in one transaction, then dispatch asynchronously.
-    var message = new OutboxMessage
-    {
-        Id = Guid.NewGuid(),
-        EventType = nameof(OrderCreated),
-        RoutingKey = "order.created", // topic routing key
-        Payload = JsonSerializer.Serialize(evt, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-        CreatedAt = DateTime.UtcNow,
-        Processed = false
-    };
-
-    db.OutboxMessages.Add(message);
-    await db.SaveChangesAsync();
+    await publisher.EnqueueAsync(evt);
 
     return Results.Ok(new { orderId, status = "queued" });
 });

@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Contracts;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
@@ -48,20 +47,21 @@ public class OutboxDispatcher : BackgroundService
         {
             try
             {
-                switch (msg.EventType)
+                var eventType = Type.GetType(msg.ClrType);
+                if (eventType == null)
                 {
-                    case nameof(OrderCreated):
-                        var evt = JsonSerializer.Deserialize<OrderCreated>(msg.Payload, JsonOptions);
-                        if (evt != null)
-                        {
-                            // Routing key comes from the outbox record (e.g., order.created)
-                            await _publish.Publish(evt, ctx => ctx.SetRoutingKey(msg.RoutingKey), ct);
-                        }
-                        break;
-                    default:
-                        _logger.LogWarning("Unknown event type {Type}", msg.EventType);
-                        break;
+                    _logger.LogWarning("Unknown CLR type {Type} for message {MessageId}", msg.ClrType, msg.Id);
+                    continue;
                 }
+
+                var evt = JsonSerializer.Deserialize(msg.Payload, eventType, JsonOptions);
+                if (evt == null)
+                {
+                    _logger.LogWarning("Failed to deserialize payload for {Type} message {MessageId}", msg.ClrType, msg.Id);
+                    continue;
+                }
+
+                await _publish.Publish(evt, eventType, ctx => ctx.SetRoutingKey(msg.RoutingKey), ct);
 
                 msg.Processed = true;
                 msg.ProcessedAt = DateTime.UtcNow;
