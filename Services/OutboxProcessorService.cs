@@ -1,8 +1,8 @@
-using System.Text;
 using System.Text.Json;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
-using RabbitMQ.Client;
 using TransactionOutboxDemo.Db;
+using TransactionOutboxDemo.Domain.Events;
 
 namespace TransactionOutboxDemo.Services;
 
@@ -10,26 +10,21 @@ public class OutboxProcessorService : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<OutboxProcessorService> _logger;
-    private readonly IConnection _rabbitMqConnection;
-    private readonly IModel _channel;
+    private readonly IPublishEndpoint _publishEndpoint;
     private readonly TimeSpan _pollingInterval = TimeSpan.FromSeconds(5);
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
 
     public OutboxProcessorService(
         IServiceProvider serviceProvider,
         ILogger<OutboxProcessorService> logger,
-        IConnection rabbitMqConnection)
+        IPublishEndpoint publishEndpoint)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
-        _rabbitMqConnection = rabbitMqConnection;
-        _channel = _rabbitMqConnection.CreateModel();
-        
-        // Declare exchange for domain events
-        _channel.ExchangeDeclare(
-            exchange: "domain-events",
-            type: ExchangeType.Topic,
-            durable: true,
-            autoDelete: false);
+        _publishEndpoint = publishEndpoint;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -93,32 +88,24 @@ public class OutboxProcessorService : BackgroundService
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private Task PublishMessageAsync(OutboxMessage message, CancellationToken cancellationToken)
+    private async Task PublishMessageAsync(OutboxMessage message, CancellationToken cancellationToken)
     {
-        var routingKey = message.EventType.ToLowerInvariant();
-        var body = Encoding.UTF8.GetBytes(message.Payload);
-
-        var properties = _channel.CreateBasicProperties();
-        properties.Persistent = true;
-        properties.MessageId = message.Id.ToString();
-        properties.Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-        properties.Type = message.EventType;
-
-        _channel.BasicPublish(
-            exchange: "domain-events",
-            routingKey: routingKey,
-            basicProperties: properties,
-            body: body);
-
-        return Task.CompletedTask;
-    }
-
-    public override void Dispose()
-    {
-        _channel?.Close();
-        _channel?.Dispose();
-        _rabbitMqConnection?.Close();
-        _rabbitMqConnection?.Dispose();
-        base.Dispose();
+        switch (message.EventType)
+        {
+            case nameof(OrderCreatedEvent):
+                var orderCreated = JsonSerializer.Deserialize<OrderCreatedEvent>(message.Payload, JsonOptions);
+                if (orderCreated != null)
+                {
+                    await _publishEndpoint.Publish(orderCreated, cancellationToken);
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to deserialize {EventType} message {MessageId}", message.EventType, message.Id);
+                }
+                break;
+            default:
+                _logger.LogWarning("Unsupported event type {EventType} for message {MessageId}", message.EventType, message.Id);
+                break;
+        }
     }
 }

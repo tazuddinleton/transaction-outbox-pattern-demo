@@ -4,7 +4,7 @@ A .NET 9.0 ASP.NET Core Web API demonstration of the **Transaction Outbox Patter
 
 ## Overview
 
-This project demonstrates how to implement the Transaction Outbox Pattern, which ensures that domain events are reliably published to a message broker (RabbitMQ) while maintaining transactional consistency with your database operations.
+This project demonstrates how to implement the Transaction Outbox Pattern, which ensures that domain events are reliably published to a message broker (RabbitMQ via MassTransit) while maintaining transactional consistency with your database operations.
 
 ### What is the Transaction Outbox Pattern?
 
@@ -20,7 +20,7 @@ The solution consists of several key components:
 1. **Domain Events**: Domain entities raise events when business operations occur
 2. **EF Core Interceptor**: Automatically captures domain events and saves them to an outbox table in the same database transaction
 3. **Outbox Table**: Stores domain events as JSON in PostgreSQL (using JSONB column type)
-4. **Background Service**: Periodically polls the outbox table and publishes unprocessed messages to RabbitMQ
+4. **Background Service**: Periodically polls the outbox table and publishes unprocessed messages to RabbitMQ through MassTransit
 5. **Unit of Work**: Manages database transactions to ensure atomicity
 
 ### Flow
@@ -43,6 +43,7 @@ The solution consists of several key components:
 - **Entity Framework Core 9.0** - ORM
 - **PostgreSQL** - Database (with JSONB support)
 - **RabbitMQ** - Message broker
+- **MassTransit** - Message bus / transport abstraction for publishing events
 - **Swagger/OpenAPI** - API documentation
 
 ## Prerequisites
@@ -161,7 +162,7 @@ The `DomainEventInterceptor` intercepts `SaveChanges` operations and:
 
 The `OutboxProcessorService` background service:
 - Polls for unprocessed outbox messages every 5 seconds
-- Publishes messages to RabbitMQ exchange `domain-events`
+- Publishes messages to RabbitMQ via MassTransit
 - Marks messages as processed after successful publication
 - Automatically retries failed messages on the next polling cycle
 

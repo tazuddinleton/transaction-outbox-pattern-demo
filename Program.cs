@@ -1,5 +1,5 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
-using RabbitMQ.Client;
 using TransactionOutboxDemo.Db;
 using TransactionOutboxDemo.Services;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -23,24 +23,27 @@ builder.Services.AddDbContext<OrderDbContext>(options =>
 // Register Unit of Work
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-// Configure RabbitMQ
+// Configure MassTransit with RabbitMQ transport
 var rabbitMqHostName = builder.Configuration["RabbitMQ:HostName"] ?? "localhost";
 var rabbitMqPort = int.Parse(builder.Configuration["RabbitMQ:Port"] ?? "5672");
 var rabbitMqUserName = builder.Configuration["RabbitMQ:UserName"] ?? "guest";
 var rabbitMqPassword = builder.Configuration["RabbitMQ:Password"] ?? "guest";
 
-builder.Services.AddSingleton<IConnection>(sp =>
+builder.Services.AddMassTransit(cfg =>
 {
-    var factory = new ConnectionFactory
+    cfg.SetKebabCaseEndpointNameFormatter();
+
+    cfg.UsingRabbitMq((context, busCfg) =>
     {
-        HostName = rabbitMqHostName,
-        Port = rabbitMqPort,
-        UserName = rabbitMqUserName,
-        Password = rabbitMqPassword,
-        AutomaticRecoveryEnabled = true,
-        NetworkRecoveryInterval = TimeSpan.FromSeconds(10)
-    };
-    return factory.CreateConnection();
+        var hostUri = new Uri($"rabbitmq://{rabbitMqHostName}:{rabbitMqPort}/");
+        busCfg.Host(hostUri, h =>
+        {
+            h.Username(rabbitMqUserName);
+            h.Password(rabbitMqPassword);
+        });
+
+        // No consumers yet, but keep bus alive for publishing outbox events
+    });
 });
 
 // Register Outbox Processor Service
