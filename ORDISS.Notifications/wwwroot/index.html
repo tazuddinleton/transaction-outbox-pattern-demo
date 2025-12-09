@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Long-Poll Notifications Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        .controls {
+            margin: 20px 0;
+        }
+        input {
+            padding: 8px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            margin-right: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .notification-list {
+            margin-top: 30px;
+        }
+        .notification-item {
+            background-color: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .notification-title { font-weight: bold; color: #0066cc; }
+        .notification-body { color: #333; margin-top: 5px; }
+        .notification-time { font-size: 0.9em; color: #999; margin-top: 5px; }
+        .status {
+            padding: 10px;
+            margin-top: 20px;
+            border-radius: 4px;
+            background-color: #f0f0f0;
+        }
+        .status.active { background-color: #d4edda; color: #155724; }
+        .status.error { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📬 Long-Poll Notifications Demo</h1>
+        
+        <div class="controls">
+            <input type="text" id="userIdInput" placeholder="Enter userId" value="test-user" style="padding: 8px; margin-right: 10px;">
+            <button id="startBtn" onclick="startPolling()">Start Polling</button>
+            <button id="stopBtn" onclick="stopPolling()" disabled>Stop Polling</button>
+            <button id="sendTestBtn" onclick="sendTestNotification()">Send Test Notification</button>
+        </div>
+
+        <div id="status" class="status">Status: Ready</div>
+
+        <div class="notification-list">
+            <h2>Notifications</h2>
+            <div id="notificationContainer"></div>
+        </div>
+    </div>
+
+    <script src="js/notification-client.js"></script>
+    <script>
+        let client = null;
+
+        function startPolling() {
+            const userId = document.getElementById('userIdInput').value || 'test-user';
+            
+            client = new LongPollNotificationClient(userId, '/api/notifications');
+            
+            client.onNotification = (notifications) => {
+                updateStatus('active', `✅ Received ${notifications.length} notification(s)`);
+                notifications.forEach(notif => {
+                    addNotificationToUI(notif);
+                });
+            };
+
+            client.onError = (error) => {
+                updateStatus('error', `❌ Error: ${error.message}`);
+            };
+
+            client.start();
+            
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('userIdInput').disabled = true;
+            updateStatus('active', '🟢 Polling started...');
+        }
+
+        function stopPolling() {
+            if (client) {
+                client.stop();
+            }
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('userIdInput').disabled = false;
+            updateStatus('', 'Polling stopped');
+        }
+
+        function sendTestNotification() {
+            const userId = document.getElementById('userIdInput').value || 'test-user';
+            
+            const payload = {
+                userId: userId,
+                title: `Test Notification ${Date.now()}`,
+                body: 'This is a test notification sent at ' + new Date().toLocaleTimeString()
+            };
+
+            fetch('/api/notifications/test/notify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(data => {
+                console.log('Test notification sent:', data);
+                updateStatus('active', '✅ Test notification sent');
+            })
+            .catch(err => {
+                console.error('Error sending test notification:', err);
+                updateStatus('error', '❌ Failed to send test notification');
+            });
+        }
+
+        function addNotificationToUI(notification) {
+            const container = document.getElementById('notificationContainer');
+            const item = document.createElement('div');
+            item.className = 'notification-item';
+            item.innerHTML = `
+                <div class="notification-title">${escapeHtml(notification.title)}</div>
+                <div class="notification-body">${escapeHtml(notification.body)}</div>
+                <div class="notification-time">ID: ${notification.id} | ${new Date(notification.createdAt).toLocaleTimeString()}</div>
+            `;
+            container.insertBefore(item, container.firstChild);
+        }
+
+        function updateStatus(className, message) {
+            const status = document.getElementById('status');
+            status.className = 'status ' + className;
+            status.textContent = message;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
