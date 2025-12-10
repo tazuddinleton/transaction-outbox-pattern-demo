@@ -13,7 +13,7 @@ public class OrderDbContext : DbContext
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
 
     // Internal field for interceptor to track entity-event mappings
-    internal Dictionary<Domain.Entity, List<Domain.IDomainEvent>>? _EntityEventMap;
+    internal Dictionary<Domain.Entity, List<Domain.DomainEvent>>? _EntityEventMap;
 
     public OrderDbContext(DbContextOptions<OrderDbContext> options) : base(options)
     {

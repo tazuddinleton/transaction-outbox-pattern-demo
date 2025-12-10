@@ -1,10 +1,8 @@
 namespace TransactionOutboxDemo.Domain.Events;
 
-public class OrderCreatedEvent : IDomainEvent
+public record OrderCreatedEvent : DomainEvent
 {
-    public Guid EventId { get; } = Guid.NewGuid();
-    public DateTime OccurredOn { get; } = DateTime.UtcNow;
-    public string EventType => nameof(OrderCreatedEvent);
+    public override string RoutingKey => "order.created";
     
     public int OrderId { get; set; }
     public string CustomerName { get; set; } = null!;

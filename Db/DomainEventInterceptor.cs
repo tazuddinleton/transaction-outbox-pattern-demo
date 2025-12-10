@@ -57,7 +57,7 @@ public class DomainEventInterceptor : SaveChangesInterceptor
             .ToList();
 
         var outboxMessages = new List<OutboxMessage>();
-        var entityEventMap = new Dictionary<Entity, List<IDomainEvent>>();
+        var entityEventMap = new Dictionary<Entity, List<DomainEvent>>();
 
         foreach (var entity in entities)
         {
@@ -69,7 +69,7 @@ public class DomainEventInterceptor : SaveChangesInterceptor
                 var outboxMessage = new OutboxMessage
                 {
                     Id = domainEvent.EventId,
-                    EventType = domainEvent.EventType,
+                    EventType = domainEvent.GetType().Name,
                     Payload = JsonSerializer.Serialize(domainEvent, domainEvent.GetType(), JsonOptions),
                     CreatedAt = domainEvent.OccurredOn,
                     Processed = false

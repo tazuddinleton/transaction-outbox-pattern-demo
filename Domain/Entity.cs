@@ -1,12 +1,18 @@
 namespace TransactionOutboxDemo.Domain;
 
-public abstract class Entity
+public interface IHasDomainEvent
 {
-    private readonly List<IDomainEvent> _domainEvents = new();
+    IReadOnlyCollection<DomainEvent> DomainEvents { get; }
+    void ClearDomainEvents();
+}
+
+public abstract class Entity : IHasDomainEvent
+{
+    private readonly List<DomainEvent> _domainEvents = new();
     
-    public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+    public IReadOnlyCollection<DomainEvent> DomainEvents => _domainEvents.AsReadOnly();
     
-    protected void AddDomainEvent(IDomainEvent domainEvent)
+    protected void AddDomainEvent(DomainEvent domainEvent)
     {
         _domainEvents.Add(domainEvent);
     }

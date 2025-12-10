@@ -1,17 +1,10 @@
 ﻿namespace Contracts;
 
-public interface IIntegrationEvent
-{
-    Guid EventId { get; }
-    DateTime OccurredOn { get; }
-    string RoutingKey { get; }
-}
+using TransactionOutboxDemo.Domain;
 
-public abstract record IntegrationEvent : IIntegrationEvent
+public abstract record IntegrationEvent : DomainEvent
 {
-    public Guid EventId { get; init; } = Guid.NewGuid();
-    public DateTime OccurredOn { get; init; } = DateTime.UtcNow;
-    public abstract string RoutingKey { get; }
+    // Inherits EventId, OccurredOn, RoutingKey from DomainEvent
 }
 
 public record OrderCreated(Guid OrderId, string CustomerEmail, decimal TotalAmount, DateTime OrderDate) 
